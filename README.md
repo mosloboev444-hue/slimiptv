@@ -9,11 +9,14 @@
 [![Android TV](https://img.shields.io/badge/Android%20TV-8.0%2B-3ddc84?style=flat-square)](https://developer.android.com/tv)
 [![Channels](https://img.shields.io/badge/%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB%D0%BE%D0%B2-1252-6ed6ff?style=flat-square)](#)
 
+[![Stars](https://img.shields.io/github/stars/mosloboev444-hue/slimiptv?style=flat-square&color=c49bff)](https://github.com/mosloboev444-hue/slimiptv/stargazers)
+[![Downloads](https://img.shields.io/github/downloads/mosloboev444-hue/slimiptv/total?style=flat-square&color=6ed6ff)](https://github.com/mosloboev444-hue/slimiptv/releases)
+
 [Скачать APK](https://github.com/mosloboev444-hue/slimiptv/releases/latest) · [Другие проекты](#экосистема)
 
 </div>
 
-![Список каналов](screenshots/01-channels.png)
+![Демонстрация](docs/demo.gif)
 
 ## Что умеет
 
