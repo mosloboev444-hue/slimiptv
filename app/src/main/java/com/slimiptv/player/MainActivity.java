@@ -387,8 +387,40 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     @Override public boolean onSurfaceTextureDestroyed(SurfaceTexture st) { return true; }
     @Override public void onSurfaceTextureUpdated(SurfaceTexture st) { }
 
-    @Override protected void onPause() { super.onPause(); }
+    @Override protected void onPause() {
+        super.onPause();
+        // уходя с экрана (HOME, другое приложение) — глушим звук
+        pauseQuietly();
+    }
+
+    @Override protected void onResume() {
+        super.onResume();
+        if (player == null && currentIndex >= 0 && !channels.isEmpty()) {
+            play(currentIndex);      // вернулись в приложение — включаем канал заново
+        } else {
+            resumeQuietly();
+        }
+    }
+
+    @Override protected void onStop() {
+        super.onStop();
+        // если приложение полностью свернули — освобождаем плеер
+        if (!isChangingConfigurations() && !isFinishing()) releasePlayer();
+    }
+
     @Override protected void onDestroy() { releasePlayer(); super.onDestroy(); }
+
+    private void pauseQuietly() {
+        MediaPlayer mp = player;
+        if (mp == null) return;
+        try { if (mp.isPlaying()) mp.pause(); } catch (Throwable ignored) { }
+    }
+
+    private void resumeQuietly() {
+        MediaPlayer mp = player;
+        if (mp == null) return;
+        try { if (!mp.isPlaying()) mp.start(); } catch (Throwable ignored) { }
+    }
 
     // ---------- адаптер ----------
     private final HashMap<String, Bitmap> logoCache = new HashMap<>();
