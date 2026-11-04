@@ -1,81 +1,70 @@
-# SlimIPTV — простой IPTV-плеер для Android TV
+<div align="center">
 
-[![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
-[![APK](https://img.shields.io/badge/APK-48%20KB-0aa1dd)](https://github.com/mosloboev444-hue/slimiptv/releases/latest)
-[![Android TV](https://img.shields.io/badge/Android%20TV-8.0%2B-3ddc84)](https://developer.android.com/tv)
+# SlimIPTV
 
-Лёгкий плеер для просмотра IPTV на ТВ-приставке: список каналов, переключение стрелками пульта,
-HLS и HTTP-потоки, свой плейлист с диска. Написан на Java без сторонних библиотек — **48 КБ APK**,
-без рекламы, аккаунтов и аналитики.
+**IPTV-плеер для Android TV: список каналов, цифровой ввод с пульта, автообновление плейлиста.**
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f?style=flat-square)](LICENSE)
+[![APK](https://img.shields.io/badge/APK-50%20KB-0aa1dd?style=flat-square)](https://github.com/mosloboev444-hue/slimiptv/releases/latest)
+[![Android TV](https://img.shields.io/badge/Android%20TV-8.0%2B-3ddc84?style=flat-square)](https://developer.android.com/tv)
+[![Channels](https://img.shields.io/badge/%D0%BA%D0%B0%D0%BD%D0%B0%D0%BB%D0%BE%D0%B2-1252-6ed6ff?style=flat-square)](#)
+
+[Скачать APK](https://github.com/mosloboev444-hue/slimiptv/releases/latest) · [Другие проекты](#экосистема)
+
+</div>
 
 ![Список каналов](screenshots/01-channels.png)
 
-## Возможности
+## Что умеет
 
-- **Плейлист M3U** — встроенный набор из 1252 российских каналов, проверенных двумя прогонами подряд или ваш файл
-  `/sdcard/Download/ru.m3u` (он приоритетнее встроенного).
-- **Список каналов** — название и категория, крупный шрифт, подсветка фокуса.
-- **Воспроизведение** — системный `MediaPlayer` (HLS/HTTP), подготовка потока в фоновом потоке,
-  поэтому интерфейс не подвисает даже на мёртвых каналах.
-- **Статусы** — «Подключение…», «Буферизация…», «Канал недоступен», «Поток завершён».
-- **Автообновление плейлиста** — при запуске и раз в сутки приложение скачивает свежий список с GitHub, кэширует локально; MENU — принудительное обновление.
-- **Автозапуск** — открывается автоматически при включении приставки.
+- **Плейлист M3U**: 1252 встроенных российских канала (проверены двумя прогонами) или свой файл `/sdcard/Download/ru.m3u`.
+- **Автообновление**: тянет свежий плейлист с GitHub при запуске и раз в сутки, кэширует локально; MENU — обновить сразу.
+- **Пропуск мёртвых каналов**: ошибка или 12 секунд без потока — плеер сам уходит на следующий, битые запоминает.
+- **Цифровой ввод**: набрал номер пультами — включился канал; `DEL` — сброс.
+- **Логотипы каналов** в списке (асинхронная загрузка с кэшем).
+- **Звук не мешает**: при открытии списка и при выходе на рабочий стол воспроизведение останавливается.
+- **Автозапуск**: играет последний канал (или первый) при старте.
 
-## Управление пультом
+## Пульт
 
 | кнопка | действие |
 |---|---|
-OK | включить канал из списка |
-↑ / ↓ (в плеере) | следующий / предыдущий канал |
-BACK | вернуться к списку |
-MENU | перечитать плейлист из `Download/ru.m3u` |
-
-![Воспроизведение](screenshots/02-playing.png)
+| OK | включить канал из списка |
+| ▲ ▼ | соседний канал |
+| 0–9 | номер канала, `DEL` — сброс |
+| MENU | показать/скрыть список |
+| ↩ | назад / выход |
 
 ## Установка
 
 ```bash
-adb install -r release/SlimIPTV-1.3.apk
-adb push ru.m3u /sdcard/Download/ru.m3u   # необязательно: свой плейлист
+adb install -r SlimIPTV-1.8.apk
+adb push my.m3u /sdcard/Download/ru.m3u   # необязательно
 ```
-
-Требования: Android TV 8.0+ (API 26), ARM.
 
 ## Проверка плейлиста
 
-Публичные плейлисты быстро «гниют»: часть каналов перестаёт отвечать. В репозитории есть скрипт,
-который оставляет только живые потоки (нужен `ffprobe` из состава ffmpeg):
+Публичные плейлисты быстро устаревают. В репозитории есть скрипты:
 
 ```bash
-# двухпроходная проверка: канал остаётся, только если ответил дважды
-python tools/two_pass_verify.py
-# или быстрая одиночная проверка своего файла
+# одиночная проверка своего файла
 python tools/verify_playlist.py ru.m3u -o ru_working.m3u --workers 20 --dedupe
+
+# двухпроходная проверка (канал остаётся, если ответил дважды)
+python tools/two_pass_verify.py
 ```
 
-Скрипт проверяет каждый поток, удаляет нерабочие, при `--dedupe` убирает дубли по названию
-и сортирует по категории. Пример реального прогона: 1531 поток → 1252 канала, ответивших дважды подряд.
+Требуется `ffprobe` (из состава ffmpeg). Реальный прогон: 1531 поток → 1252 канала, ответивших дважды.
 
-## Сборка
+## Экосистема
 
-```bash
-# JDK 17 + Android SDK platform 34, build-tools 34.0.0
-./gradlew assembleRelease
-```
-
-Для подписи положите рядом `keystore.properties`:
-
-```properties
-storeFile=/путь/к/ключу.jks
-storePassword=пароль
-keyAlias=алиас
-keyPassword=пароль
-```
-
-Без этого файла release соберётся с debug-подписью (годится для сайдлоада).
+| проект | что это |
+|---|---|
+| [SlimHome](https://github.com/mosloboev444-hue/slimhome) | лаунчер для ТВ: стеклянная сетка, погода, кнопка VPN |
+| **SlimIPTV** | этот плеер |
+| [SlimVPN](https://github.com/mosloboev444-hue/slimvpn) | VPN-клиент AmneziaWG с автоподключением под YouTube |
 
 ## Лицензия
 
 MIT — см. [LICENSE](LICENSE). Код и дизайн: **Andrey Masloboev**.
-Плейлисты — публичные наборы из проектов [ngrch/iptv](https://github.com/ngrch/iptv)
-и [iptv-org/iptv](https://github.com/iptv-org/iptv); права на вещание принадлежат их владельцам.
+Плейлисты — публичные наборы из [ngrch/iptv](https://github.com/ngrch/iptv) и [iptv-org/iptv](https://github.com/iptv-org/iptv); права на вещание принадлежат их владельцам.
