@@ -388,7 +388,12 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         tvChannel.setVisibility(show ? View.GONE : View.VISIBLE);
         // SurfaceView перекрывает интерфейс: показываем его только в плеере
         surface.setVisibility(show ? View.GONE : View.VISIBLE);
-        if (show) { list.requestFocus(); if (currentIndex >= 0) list.setSelection(currentIndex); }
+        if (show) {
+            // список открыт — картинки нет, поэтому и звук не должен идти
+            pauseQuietly();
+            list.requestFocus();
+            if (currentIndex >= 0) list.setSelection(currentIndex);
+        }
     }
 
     // ---------- клавиши ----------
