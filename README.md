@@ -1,0 +1,77 @@
+# SlimIPTV — простой IPTV-плеер для Android TV
+
+[![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
+[![APK](https://img.shields.io/badge/APK-41%20KB-0aa1dd)](https://github.com/mosloboev444-hue/slimiptv/releases/latest)
+[![Android TV](https://img.shields.io/badge/Android%20TV-8.0%2B-3ddc84)](https://developer.android.com/tv)
+
+Лёгкий плеер для просмотра IPTV на ТВ-приставке: список каналов, переключение стрелками пульта,
+HLS и HTTP-потоки, свой плейлист с диска. Написан на Java без сторонних библиотек — **41 КБ APK**,
+без рекламы, аккаунтов и аналитики.
+
+![Список каналов](screenshots/01-channels.png)
+
+## Возможности
+
+- **Плейлист M3U** — встроенный набор из 1145 проверенных российских каналов или ваш файл
+  `/sdcard/Download/ru.m3u` (он приоритетнее встроенного).
+- **Список каналов** — название и категория, крупный шрифт, подсветка фокуса.
+- **Воспроизведение** — системный `MediaPlayer` (HLS/HTTP), подготовка потока в фоновом потоке,
+  поэтому интерфейс не подвисает даже на мёртвых каналах.
+- **Статусы** — «Подключение…», «Буферизация…», «Канал недоступен», «Поток завершён».
+- **Обновление плейлиста** — положить файл в `Download` и нажать MENU, переустановка не нужна.
+
+## Управление пультом
+
+| кнопка | действие |
+|---|---|
+OK | включить канал из списка |
+↑ / ↓ (в плеере) | следующий / предыдущий канал |
+BACK | вернуться к списку |
+MENU | перечитать плейлист из `Download/ru.m3u` |
+
+![Воспроизведение](screenshots/02-playing.png)
+
+## Установка
+
+```bash
+adb install -r release/SlimIPTV-1.1.apk
+adb push ru.m3u /sdcard/Download/ru.m3u   # необязательно: свой плейлист
+```
+
+Требования: Android TV 8.0+ (API 26), ARM.
+
+## Проверка плейлиста
+
+Публичные плейлисты быстро «гниют»: часть каналов перестаёт отвечать. В репозитории есть скрипт,
+который оставляет только живые потоки (нужен `ffprobe` из состава ffmpeg):
+
+```bash
+python tools/verify_playlist.py ru.m3u -o ru_working.m3u --workers 20 --dedupe
+```
+
+Скрипт проверяет каждый поток, удаляет нерабочие, при `--dedupe` убирает дубли по названию
+и сортирует по категории. Пример реального прогона: 1489 потоков → 1265 рабочих → 1145 после дедупликации.
+
+## Сборка
+
+```bash
+# JDK 17 + Android SDK platform 34, build-tools 34.0.0
+./gradlew assembleRelease
+```
+
+Для подписи положите рядом `keystore.properties`:
+
+```properties
+storeFile=/путь/к/ключу.jks
+storePassword=пароль
+keyAlias=алиас
+keyPassword=пароль
+```
+
+Без этого файла release соберётся с debug-подписью (годится для сайдлоада).
+
+## Лицензия
+
+MIT — см. [LICENSE](LICENSE). Код и дизайн: **Andrey Masloboev**.
+Плейлисты — публичные наборы из проектов [ngrch/iptv](https://github.com/ngrch/iptv)
+и [iptv-org/iptv](https://github.com/iptv-org/iptv); права на вещание принадлежат их владельцам.
