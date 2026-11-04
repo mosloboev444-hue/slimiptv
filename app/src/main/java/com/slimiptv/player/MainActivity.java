@@ -262,6 +262,10 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     // ---------- воспроизведение ----------
     private volatile int playToken = 0;
     private Thread prepareThread;
+    private final java.util.HashSet<String> badUrls = new java.util.HashSet<>();
+    private int skipStreak = 0;
+    private static final int MAX_SKIP = 15;          // сколько подряд пробуем, прежде чем сдаться
+    private static final long PREPARE_TIMEOUT = 12000L;
 
     private void play(final int index) {
         if (index < 0 || index >= channels.size()) return;
@@ -275,6 +279,12 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         safeText(tvStatus, "Подключение…");
         releasePlayer();
         final int token = ++playToken;
+        final boolean[] prepared = {false};
+
+        // если канал не отдал поток за 12 секунд — считаем недоступным и уходим дальше
+        ui.postDelayed(() -> {
+            if (token == playToken && !prepared[0]) failChannel(index, token);
+        }, PREPARE_TIMEOUT);
 
         prepareThread = new Thread(() -> {
             MediaPlayer mp = null;
@@ -285,8 +295,14 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                 if (videoSurface != null && videoSurface.isValid()) fmp.setSurface(videoSurface);
                 fmp.setOnPreparedListener(m -> ui.post(() -> {
                     if (token != playToken) return;
-                    try { safeText(tvStatus, ""); m.start(); }
-                    catch (Throwable th) { safeText(tvStatus, "Канал недоступен"); }
+                    try {
+                        safeText(tvStatus, "");
+                        m.start();
+                        prepared[0] = true;
+                        skipStreak = 0;               // канал заработал — счётчик сбрасываем
+                    } catch (Throwable th) {
+                        failChannel(index, token);
+                    }
                 }));
                 fmp.setOnInfoListener((m, what, extra) -> {
                     ui.post(() -> {
@@ -297,9 +313,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                     return true;
                 });
                 fmp.setOnErrorListener((m, what, extra) -> {
-                    ui.post(() -> {
-                        if (token == playToken) safeText(tvStatus, "Канал недоступен — стрелками выберите другой");
-                    });
+                    ui.post(() -> failChannel(index, token));
                     return true;
                 });
                 fmp.setOnCompletionListener(m -> ui.post(() -> {
@@ -312,13 +326,43 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                 fmp.prepareAsync();
             } catch (Throwable th) {
                 releaseQuietly(mp);
-                ui.post(() -> {
-                    if (token == playToken) safeText(tvStatus, "Канал недоступен — стрелками выберите другой");
-                });
+                ui.post(() -> failChannel(index, token));
             }
         }, "iptv-prepare");
         prepareThread.setDaemon(true);
         prepareThread.start();
+    }
+
+    /** Канал не отдал поток: помечаем и сразу переходим к следующему. */
+    private void failChannel(int index, int token) {
+        if (token != playToken) return;
+        if (index >= 0 && index < channels.size()) badUrls.add(channels.get(index).url);
+
+        if (++skipStreak > MAX_SKIP) {
+            skipStreak = 0;
+            safeText(tvStatus, "Не удалось найти рабочий канал");
+            showList(true);
+            return;
+        }
+
+        int next = nextGoodIndex(index);
+        if (next < 0) {
+            safeText(tvStatus, "Доступных каналов не осталось");
+            showList(true);
+            return;
+        }
+        safeText(tvStatus, "Канал недоступен — переключаю…");
+        play(next);
+    }
+
+    /** Следующий канал, который ещё не признан битым. */
+    private int nextGoodIndex(int from) {
+        int n = channels.size();
+        for (int step = 1; step <= n; step++) {
+            int i = ((from + step) % n + n) % n;
+            if (!badUrls.contains(channels.get(i).url)) return i;
+        }
+        return -1;
     }
 
     private void releasePlayer() {
