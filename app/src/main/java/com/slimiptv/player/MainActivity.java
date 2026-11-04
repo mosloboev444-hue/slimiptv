@@ -53,7 +53,14 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         }
     }
 
+    // автообновление плейлиста
+    private static final String PLAYLIST_URL =
+            "https://raw.githubusercontent.com/mosloboev444-hue/slimiptv/main/playlist/ru.m3u";
+    private static final String PREFS = "slimiptv";
+    private static final long REFRESH_INTERVAL = 24L * 60 * 60 * 1000;
+
     private final List<Channel> channels = new ArrayList<>();
+    private volatile boolean updating = false;
     private ListView list;
     private LinearLayout listPanel;
     private TextureView surface;
@@ -96,26 +103,109 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     }
 
     // ---------- плейлист ----------
+    private File cachedPlaylist() {
+        return new File(getFilesDir(), "ru.m3u");
+    }
+
     private void loadPlaylist() {
         channels.clear();
-        File external = new File("/sdcard/Download/ru.m3u");
-        boolean fromFile = false;
-        if (external.exists()) {
-            try (BufferedReader r = new BufferedReader(new FileReader(external))) {
-                parse(r);
-                fromFile = true;
-            } catch (Exception ignored) { }
-        }
-        if (channels.isEmpty()) {
+        String source = "встроенный";
+        File cache = cachedPlaylist();
+        File download = new File("/sdcard/Download/ru.m3u");
+
+        if (cache.exists() && readInto(cache)) {
+            source = "обновлённый " + new java.text.SimpleDateFormat("dd.MM HH:mm", new java.util.Locale("ru"))
+                    .format(new java.util.Date(cache.lastModified()));
+        } else if (download.exists() && readInto(download)) {
+            source = "из Download";
+        } else {
             try (BufferedReader r = new BufferedReader(new InputStreamReader(getAssets().open("ru.m3u")))) {
                 parse(r);
             } catch (Exception e) {
                 toast("Не удалось прочитать плейлист: " + e.getMessage());
             }
         }
+        refreshList(source);
+        maybeAutoUpdate(false);
+    }
+
+    private boolean readInto(File file) {
+        try (BufferedReader r = new BufferedReader(new FileReader(file))) {
+            parse(r);
+            return !channels.isEmpty();
+        } catch (Exception e) {
+            channels.clear();
+            return false;
+        }
+    }
+
+    private void refreshList(String source) {
         adapter.notifyDataSetChanged();
-        tvCount.setText(channels.size() + " каналов" + (fromFile ? " · из Download" : " · встроенный"));
-        if (!channels.isEmpty()) list.setSelection(0);
+        safeText(tvCount, channels.size() + " каналов · " + source);
+        if (!channels.isEmpty() && listPanel.getVisibility() == View.VISIBLE) list.setSelection(0);
+    }
+
+    /** Скачивает свежий плейлист, если он старше суток или принудительно. */
+    private void maybeAutoUpdate(final boolean force) {
+        if (updating) return;
+        long last = getSharedPreferences(PREFS, MODE_PRIVATE).getLong("last_update", 0L);
+        if (!force && System.currentTimeMillis() - last < REFRESH_INTERVAL) return;
+        updating = true;
+        safeText(tvCount, "обновление плейлиста…");
+        new Thread(() -> {
+            java.io.InputStream in = null;
+            java.io.FileOutputStream out = null;
+            java.net.HttpURLConnection c = null;
+            boolean ok = false;
+            try {
+                c = (java.net.HttpURLConnection) new java.net.URL(PLAYLIST_URL).openConnection();
+                c.setConnectTimeout(10000);
+                c.setReadTimeout(15000);
+                c.setInstanceFollowRedirects(true);
+                c.setRequestProperty("User-Agent", "SlimIPTV/1.3");
+                if (c.getResponseCode() == 200) {
+                    File tmp = new File(getFilesDir(), "ru_new.m3u");
+                    out = new java.io.FileOutputStream(tmp);
+                    in = c.getInputStream();
+                    byte[] buf = new byte[8192];
+                    int n, total = 0;
+                    while ((n = in.read(buf)) > 0) { out.write(buf, 0, n); total += n; }
+                    out.flush(); out.close(); out = null;
+                    if (total > 2000) {
+                        File dst = cachedPlaylist();
+                        if (dst.exists()) dst.delete();
+                        ok = tmp.renameTo(dst);
+                    }
+                }
+            } catch (Throwable ignored) {
+            } finally {
+                try { if (in != null) in.close(); } catch (Throwable ignored) { }
+                try { if (out != null) out.close(); } catch (Throwable ignored) { }
+                try { if (c != null) c.disconnect(); } catch (Throwable ignored) { }
+            }
+            final boolean success = ok;
+            ui.post(() -> {
+                updating = false;
+                if (success) {
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                            .putLong("last_update", System.currentTimeMillis()).apply();
+                    int prev = currentIndex;
+                    channels.clear();
+                    String src = "обновлённый " + new java.text.SimpleDateFormat("dd.MM HH:mm",
+                            new java.util.Locale("ru")).format(new java.util.Date());
+                    if (readInto(cachedPlaylist())) {
+                        refreshList(src);
+                        currentIndex = Math.min(prev, Math.max(0, channels.size() - 1));
+                        toast("Плейлист обновлён: " + channels.size() + " каналов");
+                    } else {
+                        loadPlaylist();
+                    }
+                } else {
+                    refreshList("встроенный");
+                    if (force) toast("Не удалось обновить плейлист — остался текущий");
+                }
+            });
+        }, "iptv-update").start();
     }
 
     private void parse(BufferedReader r) throws Exception {
@@ -254,8 +344,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                 if (listPanel.getVisibility() == View.GONE) { showList(true); return true; }
                 break;
             case KeyEvent.KEYCODE_MENU:
-                loadPlaylist();
-                toast("Плейлист обновлён: " + channels.size() + " каналов");
+                maybeAutoUpdate(true);
                 return true;
             case KeyEvent.KEYCODE_BACK:
                 if (listPanel.getVisibility() == View.GONE) { showList(true); return true; }

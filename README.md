@@ -1,11 +1,11 @@
 # SlimIPTV — простой IPTV-плеер для Android TV
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
-[![APK](https://img.shields.io/badge/APK-46%20KB-0aa1dd)](https://github.com/mosloboev444-hue/slimiptv/releases/latest)
+[![APK](https://img.shields.io/badge/APK-48%20KB-0aa1dd)](https://github.com/mosloboev444-hue/slimiptv/releases/latest)
 [![Android TV](https://img.shields.io/badge/Android%20TV-8.0%2B-3ddc84)](https://developer.android.com/tv)
 
 Лёгкий плеер для просмотра IPTV на ТВ-приставке: список каналов, переключение стрелками пульта,
-HLS и HTTP-потоки, свой плейлист с диска. Написан на Java без сторонних библиотек — **46 КБ APK**,
+HLS и HTTP-потоки, свой плейлист с диска. Написан на Java без сторонних библиотек — **48 КБ APK**,
 без рекламы, аккаунтов и аналитики.
 
 ![Список каналов](screenshots/01-channels.png)
@@ -18,7 +18,8 @@ HLS и HTTP-потоки, свой плейлист с диска. Написа�
 - **Воспроизведение** — системный `MediaPlayer` (HLS/HTTP), подготовка потока в фоновом потоке,
   поэтому интерфейс не подвисает даже на мёртвых каналах.
 - **Статусы** — «Подключение…», «Буферизация…», «Канал недоступен», «Поток завершён».
-- **Обновление плейлиста** — положить файл в `Download` и нажать MENU, переустановка не нужна.
+- **Автообновление плейлиста** — при запуске и раз в сутки приложение скачивает свежий список с GitHub, кэширует локально; MENU — принудительное обновление.
+- **Автозапуск** — открывается автоматически при включении приставки.
 
 ## Управление пультом
 
@@ -34,7 +35,7 @@ MENU | перечитать плейлист из `Download/ru.m3u` |
 ## Установка
 
 ```bash
-adb install -r release/SlimIPTV-1.2.apk
+adb install -r release/SlimIPTV-1.3.apk
 adb push ru.m3u /sdcard/Download/ru.m3u   # необязательно: свой плейлист
 ```
 
