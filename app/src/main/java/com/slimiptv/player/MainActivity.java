@@ -264,6 +264,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     private Thread prepareThread;
     private final java.util.HashSet<String> badUrls = new java.util.HashSet<>();
     private int skipStreak = 0;
+    private String channelInput = "";
     private static final int MAX_SKIP = 15;          // сколько подряд пробуем, прежде чем сдаться
     private static final long PREPARE_TIMEOUT = 12000L;
 
@@ -397,7 +398,54 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     }
 
     // ---------- клавиши ----------
+    private void appendChannelDigit(int digit) {
+        if (channelInput.length() >= 4) channelInput = "";
+        channelInput += digit;
+        safeText(tvStatus, "Канал " + channelInput);
+        ui.removeCallbacks(applyChannelInput);
+        ui.postDelayed(applyChannelInput, 1600L);
+    }
+
+    private final Runnable applyChannelInput = new Runnable() {
+        @Override public void run() {
+            String s = channelInput;
+            channelInput = "";
+            if (s.isEmpty()) return;
+            int num;
+            try { num = Integer.parseInt(s); } catch (Exception e) { return; }
+            if (num >= 1 && num <= channels.size()) {
+                play(num - 1);
+            } else {
+                safeText(tvStatus, "Канала " + num + " нет");
+            }
+        }
+    };
+
     @Override public boolean onKeyDown(int code, KeyEvent e) {
+        // цифры — прямой ввод номера канала
+        if (code >= KeyEvent.KEYCODE_0 && code <= KeyEvent.KEYCODE_9) {
+            appendChannelDigit(code - KeyEvent.KEYCODE_0);
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_DEL) {
+            channelInput = "";
+            ui.removeCallbacks(applyChannelInput);
+            safeText(tvStatus, "");
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE || code == KeyEvent.KEYCODE_HEADSETHOOK) {
+            MediaPlayer mp = player;
+            if (mp != null) {
+                try {
+                    if (mp.isPlaying()) { mp.pause(); safeText(tvStatus, "Пауза"); }
+                    else { mp.start(); safeText(tvStatus, ""); }
+                } catch (Throwable ignored) { }
+            }
+            return true;
+        }
+        if (code == KeyEvent.KEYCODE_MEDIA_NEXT || code == KeyEvent.KEYCODE_CHANNEL_UP) { switchChannel(1); return true; }
+        if (code == KeyEvent.KEYCODE_MEDIA_PREVIOUS || code == KeyEvent.KEYCODE_CHANNEL_DOWN) { switchChannel(-1); return true; }
+
         switch (code) {
             case KeyEvent.KEYCODE_DPAD_UP:
                 if (listPanel.getVisibility() == View.GONE) { switchChannel(-1); return true; }
@@ -410,7 +458,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
                 if (listPanel.getVisibility() == View.GONE) { showList(true); return true; }
                 break;
             case KeyEvent.KEYCODE_MENU:
-                maybeAutoUpdate(true);
+                showList(listPanel.getVisibility() == View.GONE);
                 return true;
             case KeyEvent.KEYCODE_BACK:
                 if (listPanel.getVisibility() == View.GONE) { showList(true); return true; }
