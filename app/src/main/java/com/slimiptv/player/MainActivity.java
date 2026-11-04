@@ -61,6 +61,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
     private final List<Channel> channels = new ArrayList<>();
     private volatile boolean updating = false;
+    private boolean autoResumed = false;
     private ListView list;
     private LinearLayout listPanel;
     private TextureView surface;
@@ -99,7 +100,7 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         list.setOnItemClickListener((parent, view, position, id) -> play(position));
 
         loadPlaylist();
-        showList(true);
+        if (current == null) showList(true);   // список показываем, только если автозапуск не сработал
     }
 
     // ---------- плейлист ----------
@@ -127,8 +128,22 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         }
         refreshList(source);
         maybeAutoUpdate(false);
+        resumeLastChannel();
     }
 
+    /** При запуске сразу включает последний канал, а если его нет — первый из списка. */
+    private void resumeLastChannel() {
+        if (channels.isEmpty() || autoResumed) return;
+        autoResumed = true;
+        String lastUrl = getSharedPreferences(PREFS, MODE_PRIVATE).getString("last_url", null);
+        int index = 0;
+        if (lastUrl != null) {
+            for (int i = 0; i < channels.size(); i++) {
+                if (lastUrl.equals(channels.get(i).url)) { index = i; break; }
+            }
+        }
+        play(index);
+    }
     private boolean readInto(File file) {
         try (BufferedReader r = new BufferedReader(new FileReader(file))) {
             parse(r);
@@ -255,6 +270,8 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         currentIndex = index;
         showList(false);
         safeText(tvChannel, ch.name);
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString("last_url", ch.url).putString("last_name", ch.name).apply();
         safeText(tvStatus, "Подключение…");
         releasePlayer();
         final int token = ++playToken;
