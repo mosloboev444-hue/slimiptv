@@ -1,18 +1,18 @@
 # SlimIPTV — простой IPTV-плеер для Android TV
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f)](LICENSE)
-[![APK](https://img.shields.io/badge/APK-41%20KB-0aa1dd)](https://github.com/mosloboev444-hue/slimiptv/releases/latest)
+[![APK](https://img.shields.io/badge/APK-46%20KB-0aa1dd)](https://github.com/mosloboev444-hue/slimiptv/releases/latest)
 [![Android TV](https://img.shields.io/badge/Android%20TV-8.0%2B-3ddc84)](https://developer.android.com/tv)
 
 Лёгкий плеер для просмотра IPTV на ТВ-приставке: список каналов, переключение стрелками пульта,
-HLS и HTTP-потоки, свой плейлист с диска. Написан на Java без сторонних библиотек — **41 КБ APK**,
+HLS и HTTP-потоки, свой плейлист с диска. Написан на Java без сторонних библиотек — **46 КБ APK**,
 без рекламы, аккаунтов и аналитики.
 
 ![Список каналов](screenshots/01-channels.png)
 
 ## Возможности
 
-- **Плейлист M3U** — встроенный набор из 1145 проверенных российских каналов или ваш файл
+- **Плейлист M3U** — встроенный набор из 1252 российских каналов, проверенных двумя прогонами подряд или ваш файл
   `/sdcard/Download/ru.m3u` (он приоритетнее встроенного).
 - **Список каналов** — название и категория, крупный шрифт, подсветка фокуса.
 - **Воспроизведение** — системный `MediaPlayer` (HLS/HTTP), подготовка потока в фоновом потоке,
@@ -34,7 +34,7 @@ MENU | перечитать плейлист из `Download/ru.m3u` |
 ## Установка
 
 ```bash
-adb install -r release/SlimIPTV-1.1.apk
+adb install -r release/SlimIPTV-1.2.apk
 adb push ru.m3u /sdcard/Download/ru.m3u   # необязательно: свой плейлист
 ```
 
@@ -46,11 +46,14 @@ adb push ru.m3u /sdcard/Download/ru.m3u   # необязательно: свой
 который оставляет только живые потоки (нужен `ffprobe` из состава ffmpeg):
 
 ```bash
+# двухпроходная проверка: канал остаётся, только если ответил дважды
+python tools/two_pass_verify.py
+# или быстрая одиночная проверка своего файла
 python tools/verify_playlist.py ru.m3u -o ru_working.m3u --workers 20 --dedupe
 ```
 
 Скрипт проверяет каждый поток, удаляет нерабочие, при `--dedupe` убирает дубли по названию
-и сортирует по категории. Пример реального прогона: 1489 потоков → 1265 рабочих → 1145 после дедупликации.
+и сортирует по категории. Пример реального прогона: 1531 поток → 1252 канала, ответивших дважды подряд.
 
 ## Сборка
 

@@ -21,6 +21,7 @@ import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.LinearLayout;
 import android.widget.ListView;
+import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -30,6 +31,14 @@ import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 
 public class MainActivity extends Activity implements TextureView.SurfaceTextureListener {
 
@@ -37,7 +46,11 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
         String name;
         String group;
         String url;
-        Channel(String n, String g, String u) { name = n; group = g; url = u; }
+        String logo;
+        int chno;
+        Channel(String n, String g, String u, String l, int c) {
+            name = n; group = g; url = u; logo = l; chno = c;
+        }
     }
 
     private final List<Channel> channels = new ArrayList<>();
@@ -107,25 +120,38 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
     private void parse(BufferedReader r) throws Exception {
         String line;
-        String pendingName = null, pendingGroup = null;
+        String pendingName = null, pendingGroup = null, pendingLogo = null;
+        int pendingChno = 9999;
         while ((line = r.readLine()) != null) {
             line = line.trim();
             if (line.isEmpty()) continue;
             if (line.startsWith("#EXTINF")) {
                 int comma = line.lastIndexOf(',');
                 pendingName = comma > 0 ? line.substring(comma + 1).trim() : "Без названия";
-                int gi = line.indexOf("group-title=\"");
-                if (gi >= 0) {
-                    int end = line.indexOf('"', gi + 13);
-                    if (end > gi) pendingGroup = line.substring(gi + 13, end);
-                } else pendingGroup = null;
+                pendingGroup = attr(line, "group-title");
+                pendingLogo = attr(line, "tvg-logo");
+                pendingChno = attrInt(line, "tvg-chno");
             } else if (!line.startsWith("#")) {
                 if (pendingName != null) {
-                    channels.add(new Channel(pendingName, pendingGroup, line));
-                    pendingName = null; pendingGroup = null;
+                    channels.add(new Channel(pendingName, pendingGroup, line, pendingLogo, pendingChno));
+                    pendingName = null; pendingGroup = null; pendingLogo = null; pendingChno = 9999;
                 }
             }
         }
+    }
+
+    private static String attr(String line, String key) {
+        String needle = key + "=\"";
+        int i = line.indexOf(needle);
+        if (i < 0) return null;
+        int start = i + needle.length();
+        int end = line.indexOf('"', start);
+        return end > start ? line.substring(start, end) : null;
+    }
+
+    private static int attrInt(String line, String key) {
+        String v = attr(line, key);
+        try { return v == null ? 9999 : Integer.parseInt(v.trim()); } catch (Exception e) { return 9999; }
     }
 
     // ---------- воспроизведение ----------
@@ -259,6 +285,33 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
     @Override protected void onDestroy() { releasePlayer(); super.onDestroy(); }
 
     // ---------- адаптер ----------
+    private final HashMap<String, Bitmap> logoCache = new HashMap<>();
+    private final ExecutorService logoPool = Executors.newFixedThreadPool(3);
+
+    private void loadLogo(final String url, final ImageView view) {
+        Bitmap cached = logoCache.get(url);
+        if (cached != null) { view.setImageBitmap(cached); return; }
+        logoPool.execute(() -> {
+            Bitmap bmp = null;
+            try {
+                HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                c.setConnectTimeout(6000);
+                c.setReadTimeout(6000);
+                c.setInstanceFollowRedirects(true);
+                try (InputStream in = c.getInputStream()) {
+                    bmp = BitmapFactory.decodeStream(in);
+                }
+                c.disconnect();
+            } catch (Throwable ignored) { }
+            final Bitmap result = bmp;
+            if (result == null) return;
+            synchronized (logoCache) { logoCache.put(url, result); }
+            ui.post(() -> {
+                if (url.equals(view.getTag())) view.setImageBitmap(result);
+            });
+        });
+    }
+
     private class ChannelAdapter extends BaseAdapter {
         @Override public int getCount() { return channels.size(); }
         @Override public Object getItem(int i) { return channels.get(i); }
@@ -266,24 +319,39 @@ public class MainActivity extends Activity implements TextureView.SurfaceTexture
 
         @Override public View getView(int position, View convertView, ViewGroup parent) {
             LinearLayout row = new LinearLayout(MainActivity.this);
-            row.setOrientation(LinearLayout.VERTICAL);
-            row.setPadding(dp(18), dp(12), dp(18), dp(12));
+            row.setOrientation(LinearLayout.HORIZONTAL);
+            row.setGravity(Gravity.CENTER_VERTICAL);
+            row.setPadding(dp(18), dp(10), dp(18), dp(10));
 
-            Channel ch = channels.get(position);
+            final Channel ch = channels.get(position);
+
+            ImageView logo = new ImageView(MainActivity.this);
+            logo.setScaleType(ImageView.ScaleType.FIT_CENTER);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(dp(56), dp(40));
+            lp.rightMargin = dp(16);
+            row.addView(logo, lp);
+            if (ch.logo != null && !ch.logo.isEmpty()) {
+                logo.setTag(ch.logo);
+                loadLogo(ch.logo, logo);
+            }
+
+            LinearLayout texts = new LinearLayout(MainActivity.this);
+            texts.setOrientation(LinearLayout.VERTICAL);
 
             TextView name = new TextView(MainActivity.this);
             name.setText(ch.name);
             name.setTextColor(Color.WHITE);
             name.setTextSize(TypedValue.COMPLEX_UNIT_SP, 19);
-            row.addView(name);
+            texts.addView(name);
 
             if (ch.group != null && !ch.group.isEmpty()) {
                 TextView group = new TextView(MainActivity.this);
                 group.setText(ch.group);
                 group.setTextColor(Color.parseColor("#8FB3D9"));
                 group.setTextSize(TypedValue.COMPLEX_UNIT_SP, 13);
-                row.addView(group);
+                texts.addView(group);
             }
+            row.addView(texts);
             return row;
         }
     }
